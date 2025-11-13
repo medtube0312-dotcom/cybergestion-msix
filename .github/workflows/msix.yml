@@ -1,11 +1,23 @@
 name: Generate CyberGestion MSIX
 on: [workflow_dispatch]
+
 jobs:
   build-msix:
     runs-on: windows-latest
     steps:
-      - name: Generate MSIX Package
-        uses: pwa-builder/pwabuild@v1
+      - name: Setup MSIX Packaging
+        uses: microsoft/setup-msbuild@v1.1
+        
+      - name: Generate PWA Package
+        run: |
+          curl -o pwa.zip https://codeload.github.com/pwa-builder/PWABuilder/zip/refs/heads/main
+          Expand-Archive pwa.zip -DestinationPath .
+          cd PWABuilder-main
+          npm install
+          npx pwa-build pack --url "https://cybergestion.netlify.app" --platform windows
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
         with:
-          url: https://cybergestion.netlify.app
-          platform: windows
+          name: cybergestion-msix
+          path: PWABuilder-main/*.msix

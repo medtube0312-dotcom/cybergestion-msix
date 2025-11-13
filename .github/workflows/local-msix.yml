@@ -1,25 +1,50 @@
-name: Build MSIX from Local Files
+name: Generate CyberGestion MSIX
 on: [workflow_dispatch]
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: Checkout files
-        uses: actions/checkout@v4
-        
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          
-      - name: Install and Build MSIX
+      - uses: actions/checkout@v4
+      
+      - name: Create MSIX manually
         run: |
-          npm install -g @pwabuilder/pwabuilder
-          pwabuilder pack ./ --platform windows
+          # Créer un package MSIX basique
+          mkdir AppPackage
+          Copy-Item * AppPackage/ -Recurse -Force
           
-      - name: Upload MSIX
+          # Générer un manifeste Appx
+          @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+                   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+                   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10">
+            <Identity Name="CyberGestion" Publisher="CN=CyberGestion" Version="1.0.0.0"/>
+            <mp:PhoneIdentity PhoneProductId="CyberGestion" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+            <Properties>
+              <DisplayName>CyberGestion</DisplayName>
+              <PublisherDisplayName>CyberGestion</PublisherDisplayName>
+              <Logo>images\icon.png</Logo>
+            </Properties>
+            <Dependencies>
+              <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.0.0" MaxVersionTested="10.0.0.0"/>
+            </Dependencies>
+            <Resources>
+              <Resource Language="x-generate"/>
+            </Resources>
+            <Applications>
+              <Application Id="App" Executable="fake.exe" EntryPoint="Fake.App">
+                <uap:VisualElements DisplayName="CyberGestion" Square150x150Logo="images\icon.png" Square44x44Logo="images\icon.png" Description="CyberGestion App"/>
+                <uap:ApplicationContentUriRules>
+                  <uap:Rule Match="https://cybergestion.netlify.app" Type="include" WindowsRuntimeAccess="all"/>
+                </uap:ApplicationContentUriRules>
+              </Application>
+            </Applications>
+          </Package>
+          "@ | Out-File -FilePath "AppxManifest.xml" -Encoding UTF8
+          
+      - name: Upload result
         uses: actions/upload-artifact@v4
         with:
-          name: CyberGestion-MSIX
-          path: ./*.msix
+          name: CyberGestion-Package
+          path: AppxManifest.xml

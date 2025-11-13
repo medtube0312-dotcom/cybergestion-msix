@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberGestion - Gestion des Ventes et Services</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="icon.ico" type="image/x-icon">
+    
+    <!-- PWA Configuration -->
+    <!-- <link rel="manifest" href="manifest.json"> --> <!-- COMMENTÉ POUR MODE FICHIER -->
+    <meta name="theme-color" content="#3498db">
+    <meta name="description" content="Système de gestion de cybercafé - Ventes et services">
+    <meta name="keywords" content="cybercafé, gestion, vente, stock, services">
+    <meta name="author" content="CyberGestion">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <!-- Modal Connexion -->
+    <div id="login-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h2>🔐 Connexion CyberGestion</h2>
+            <div class="form-group">
+                <label>Nom d'utilisateur:</label>
+                <input type="text" id="login-username" placeholder="admin ou vendeur" autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label>Mot de passe:</label>
+                <input type="password" id="login-password" placeholder="Mot de passe" autocomplete="current-password">
+            </div>
+            <div class="action-buttons">
+                <button class="btn-primary" id="btn-connexion">Se Connecter</button>
+            </div>
+            <div class="login-info">
+                <p><strong>Comptes par défaut:</strong></p>
+                <p>👑 Admin: <code>admin</code> / <code>admin123</code></p>
+                <p>👤 Vendeur: <code>vendeur</code> / <code>vendeur123</code></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Paramètres -->
+    <div id="parametres-modal" class="modal">
+        <div class="modal-content">
+            <h2>⚙️ Paramètres Système</h2>
+            
+            <div class="param-section">
+                <h3>📁 Gestion des Données</h3>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn-primary" onclick="SauvegardeManager.exporterSauvegarde()">
+                        💾 Sauvegarder Données
+                    </button>
+                    <button class="btn-secondary" onclick="document.getElementById('restore-file').click()">
+                        🔄 Restaurer Données
+                    </button>
+                    <button class="btn-warning" onclick="SauvegardeManager.creerStockTest()">
+                        🧪 Données Test
+                    </button>
+                    <input type="file" id="restore-file" accept=".json" style="display: none;" 
+                           onchange="SauvegardeManager.importerSauvegarde(event)">
+                </div>
+            </div>
+
+            <div class="param-section" id="admin-section" style="display: none;">
+                <h3>👑 Actions Administrateur</h3>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn-primary" onclick="mettreAJourStockDepuisXLS()">
+                        📥 Mettre à jour Stock depuis XLS
+                    </button>
+                    <button class="btn-danger" onclick="purgerCompletement()">
+                        🗑️ Purger Toutes les Données
+                    </button>
+                    <button class="btn-warning" onclick="reinitialiserMotDePasseAdmin()">
+                        🔑 Réinitialiser Mot de Passe Admin
+                    </button>
+                    <button class="btn-warning" onclick="afficherModalGestionUtilisateurs()">
+                        👥 Gérer Utilisateurs
+                    </button>
+                    <button class="btn-danger" onclick="purgerCacheComplet()">
+                        🧹 Purger Cache Complet
+                    </button>
+                    <button class="btn-warning" onclick="debugRecapitulatif()">
+                        🐛 Debug Récapitulatif
+                    </button>
+                </div>
+            </div>
+
+            <div class="param-section">
+                <h3>🎨 Personnalisation</h3>
+                <div class="theme-selector">
+                    <button class="theme-btn active" id="theme-light-btn" onclick="changerTheme('clair')">
+                        🌞 Mode Clair
+                    </button>
+                    <button class="theme-btn" id="theme-dark-btn" onclick="changerTheme('sombre')">
+                        🌙 Mode Sombre
+                    </button>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="btn-secondary" onclick="basculerPleinEcran()">
+                        📺 Plein Écran
+                    </button>
+                </div>
+            </div>
+
+            <div class="param-section">
+                <h3>🔧 Utilitaires</h3>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn-primary" onclick="location.reload()">
+                        🔄 Actualiser l'Application
+                    </button>
+                    <button class="btn-secondary" onclick="SessionManager.afficherDebugInfo()">
+                        🐛 Infos Debug
+                    </button>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn-secondary" onclick="fermerParametres()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Gestion Utilisateurs -->
+    <div id="gestion-utilisateurs-modal" class="modal">
+        <div class="modal-content">
+            <h2>👥 Gestion des Utilisateurs</h2>
+            
+            <div class="param-section">
+                <h3>📋 Liste des Utilisateurs</h3>
+                <div id="liste-utilisateurs" style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;">
+                    <!-- Liste des utilisateurs chargée dynamiquement -->
+                </div>
+            </div>
+
+            <div class="param-section">
+                <h3>⚡ Actions Rapides</h3>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn-primary" onclick="ajouterUtilisateur()">
+                        ➕ Ajouter Utilisateur
+                    </button>
+                    <button class="btn-warning" onclick="reinitialiserMotDePasseAdmin()">
+                        🔑 Réinitialiser Mot de Passe Admin
+                    </button>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn-secondary" onclick="fermerModalGestionUtilisateurs()">
+                    ✅ Fermer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Configuration Services -->
+    <div id="config-services-modal" class="modal">
+        <div class="modal-content">
+            <h2>🔧 Configuration des Services</h2>
+            <div id="config-services-liste">
+                <!-- Configuration des services chargée dynamiquement -->
+            </div>
+            <div class="action-buttons">
+                <button class="btn-secondary" onclick="fermerModalConfigServices()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+        <!-- Modal Remise Globale Avancée -->
+    <div id="modal-remise-globale" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 id="modal-remise-title">🎯 Remise Globale</h2>
+            
+            <div class="param-section">
+                <div class="form-group">
+                    <label>💵 Type de remise:</label>
+                    <select id="remise-type" class="form-control">
+                        <option value="DA">DA (Montant fixe)</option>
+                        <option value="%">% (Pourcentage)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>💰 Montant de la remise:</label>
+                    <input type="number" id="remise-montant" class="form-control" 
+                           placeholder="Ex: 100 ou 10" min="0" step="0.01" required>
+                    <small id="remise-help" style="color: var(--text-secondary);">
+                        <span id="help-da">Montant fixe à déduire du total</span>
+                        <span id="help-pourcent" style="display: none;">Pourcentage à appliquer sur le total</span>
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="remise-existe">
+                        <span>🗑️ Remplacer les remises existantes</span>
+                    </label>
+                    <small style="color: var(--text-secondary);">
+                        Si cochée, toutes les remises individuelles seront supprimées
+                    </small>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn-secondary" onclick="fermerModalRemiseGlobale()">
+                    ❌ Annuler
+                </button>
+                <button class="btn-primary" onclick="appliquerRemiseGlobaleAmelioree()">
+                    ✅ Appliquer Remise
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⭐⭐ NOUVEAUX MODALS RETOUR/ÉCHANGE ⭐⭐ -->
+    <!-- Modal Retour Produit -->
+    <div id="modal-retour-produit" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2>↩️ Retour Produit</h2>
+            
+            <div class="param-section">
+                <div class="form-group">
+                    <label>📦 Produit à retourner:</label>
+                    <div style="padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
+                        <strong id="modal-retour-produit-nom"></strong>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>🔢 Quantité à retourner:</label>
+                    <input type="number" id="modal-retour-quantite" class="form-control" 
+                           min="1" value="1" required>
+                    <small style="color: var(--text-secondary);">
+                        Quantité maximum: <span id="modal-retour-quantite-max"></span>
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label>💡 Information:</label>
+                    <div style="padding: 10px; background: rgba(52, 152, 219, 0.1); border-radius: 5px;">
+                        <small>
+                            • Le stock sera rétabli automatiquement<br>
+                            • Le montant sera déduit du total de la vente<br>
+                            • La vente restera dans l'historique
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Champs cachés pour stocker les indices -->
+            <input type="hidden" id="modal-retour-vente-index">
+            <input type="hidden" id="modal-retour-produit-index">
+
+            <div class="action-buttons">
+                <button class="btn-secondary" onclick="fermerModalRetourProduit()">
+                    ❌ Annuler
+                </button>
+                <button class="btn-primary" onclick="confirmerRetourProduit()">
+                    ✅ Confirmer Retour
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Échange Produit -->
+   <div id="modal-echange-produit" class="modal">
+    <div class="modal-content" style="max-width: 700px;">
+        <h2>🔄 Échange Produit</h2>
+        
+        <div class="param-section">
+            <div class="form-group">
+                <label>📦 Produit actuel:</label>
+                <div style="padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
+                    <strong id="modal-echange-produit-actuel"></strong>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>🔍 Rechercher produit de remplacement:</label>
+                <input type="text" id="recherche-echange-produit" class="form-control" 
+                       placeholder="Nom du produit..." oninput="afficherProduitsPourEchange()">
+            </div>
+            
+            <div class="form-group">
+                <label>📋 Produits disponibles:</label>
+                <div class="table-container" style="max-height: 300px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Désignation</th>
+                                <th>Code</th>
+                                <th>Stock</th>
+                                <th>Prix</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="liste-produits-echange">
+                            <!-- Produits chargés dynamiquement -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="form-group" id="section-produit-selectionne" style="display: none;">
+    <label>✅ Produit sélectionné:</label>
+    <div style="padding: 10px; background: rgba(39, 174, 96, 0.1); border: 1px solid var(--success-color); border-radius: 5px;">
+        <strong id="produit-echange-nom"></strong>
+    </div>
+    <input type="hidden" id="produit-echange-selectionne">
+    
+    <!-- NOUVEAU : Section différence de prix -->
+    <div id="section-difference-prix" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;">
+        <div id="difference-positif" style="color: var(--success-color); font-weight: bold; display: none;">
+            💰 Supplément à payer : <span id="montant-supplement">0</span> DA
+        </div>
+        <div id="difference-negatif" style="color: var(--danger-color); font-weight: bold; display: none;">
+            💰 Remboursement : <span id="montant-remboursement">0</span> DA
+        </div>
+        <div id="difference-nulle" style="color: var(--text-secondary); font-weight: bold; display: none;">
+            ⚖️ Montants identiques - Aucun ajustement
+        </div>
+    </div>
+</div>
+        </div>
+
+        <!-- Champs cachés pour stocker les indices -->
+        <input type="hidden" id="modal-echange-vente-index">
+        <input type="hidden" id="modal-echange-produit-index">
+
+        <div class="action-buttons">
+            <button class="btn-secondary" onclick="fermerModalEchangeProduit()">
+                ❌ Annuler
+            </button>
+            <button class="btn-primary" onclick="confirmerEchangeProduit()" id="btn-confirmer-echange" disabled>
+                ✅ Confirmer Échange
+            </button>
+        </div>
+    </div>
+</div>
+
+    <!-- Modal Choix Export -->
+    <div id="choix-export-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2>📊 Type d'Export</h2>
+            
+            <div class="param-section">
+                <h3>Choisissez le type d'export :</h3>
+                
+                <div class="export-options" style="display: flex; flex-direction: column; gap: 15px; margin: 20px 0;">
+                    <label class="export-option" style="display: flex; align-items: center; padding: 15px; border: 2px solid var(--border-color); border-radius: 10px; cursor: pointer; transition: all 0.3s ease;">
+                        <input type="radio" name="export-type" value="informatif" checked style="margin-right: 12px;">
+                        <div>
+                            <strong style="display: block; margin-bottom: 5px;">📋 Export Informatif</strong>
+                            <small style="color: var(--text-secondary);">
+                                Vue d'ensemble avec totaux et liste des transactions<br>
+                                <em>Idéal pour un rapport rapide</em>
+                            </small>
+                        </div>
+                    </label>
+                    
+                    <label class="export-option" style="display: flex; align-items: center; padding: 15px; border: 2px solid var(--border-color); border-radius: 10px; cursor: pointer; transition: all 0.3s ease;">
+                        <input type="radio" name="export-type" value="detaillé" style="margin-right: 12px;">
+                        <div>
+                            <strong style="display: block; margin-bottom: 5px;">📈 Export Détaillé</strong>
+                            <small style="color: var(--text-secondary);">
+                                Analyse complète avec plusieurs onglets Excel<br>
+                                <em>Idéal pour une analyse approfondie</em>
+                            </small>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn-secondary" onclick="fermerChoixExport()">❌ Annuler</button>
+                <button class="btn-primary" onclick="confirmerChoixExport()">✅ Exporter</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="main-app" style="display: none;">
+        <header>
+            <div class="header-left">
+                <h1>🖥️ CyberGestion</h1>
+                <span id="user-info" class="user-badge"></span>
+            </div>
+            
+            <div class="header-center">
+                <span id="date-time"></span>
+            </div>
+
+            <div class="header-right">
+                <span class="plein-ecran-favicon parametres-favicon" onclick="basculerPleinEcran()" title="Plein écran">📺</span>
+
+                <div class="theme-favicons">
+                    <span class="theme-icon active" id="theme-light" onclick="changerTheme('clair')">🌞</span>
+                    <span class="theme-icon" id="theme-dark" onclick="changerTheme('sombre')">🌙</span>
+                </div>
+
+                <span class="config-services-favicon parametres-favicon" onclick="afficherModalConfigServices()" title="Configurer les services" style="display: none;">🔧</span>
+
+                <span class="parametres-favicon" onclick="ouvrirParametres()">⚙️</span>
+
+                <button class="btn-logout" onclick="seDeconnecter()">🚪 Déconnexion</button>
+                
+                <button class="btn-logout" onclick="fermerApplication()">❌ Fermer</button>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-button active" data-tab="ventes">🛒 Ventes</button>
+            <button class="tab-button" data-tab="services">🔧 Services</button>
+            <button class="tab-button" data-tab="stock">📦 Stock</button>
+            <button class="tab-button" data-tab="historique">📊 Historique</button>
+            <button class="tab-button" data-tab="recapitulatif">📈 Récapitulatif</button>
+        </nav>
+
+        <!-- Onglet Ventes -->
+        <div id="ventes" class="tab-content active">
+            <div class="row">
+                <div class="col-6">
+                    <div class="card">
+                        <h3>🔍 Recherche Produit</h3>
+                        <div class="search-box">
+                            <input type="text" id="search-product" placeholder="Scannez le code barre ou recherchez par nom..." autofocus>
+                            <button onclick="rechercherProduit()" class="btn-primary">🔎 Rechercher</button>
+                            <button onclick="effacerRecherche()" class="btn-secondary">❌ Effacer</button>
+                        </div>
+                        
+                        <div class="table-container">
+                            <table id="products-table">
+                                <thead>
+                                    <tr>
+                                        <th>Désignation</th>
+                                        <th>Code</th>
+                                        <th>Prix</th>
+                                        <th>Quantité</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="products-body">
+                                    <!-- Produits chargés dynamiquement -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-6">
+                    <div class="card">
+                        <h3>🛒 Panier de Vente</h3>
+                        <div class="table-container">
+                            <table id="cart-table">
+                                <thead>
+                                    <tr>
+                                        <th class="col-designation">Produit</th>
+                                        <th class="col-quantite">Quantité</th>
+                                        <th class="col-prix">Prix U.</th>
+                                        <th class="col-remise">Remise</th>
+                                        <th class="col-total">Total</th>
+                                        <th class="col-statut">Statut</th> <!-- RÉTABLI: Colonne Statut -->
+                                        <th class="col-action">Action</th>
+                                    </tr>
+                                    <tr>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th>
+                                        <th style="text-align: center; font-size: 0.8rem; padding: 5px;">
+                                            <div style="display: flex; gap: 5px;">
+                                                <div class="col-remise-type">Type</div>
+                                                <div class="col-remise-valeur">Valeur</div>
+                                            </div>
+                                        </th>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cart-body">
+                                    <!-- Panier chargé dynamiquement -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="cart-totals">
+                            <div class="total-line">
+                                <span>Sous-total:</span>
+                                <span id="sous-total">0 DA</span>
+                            </div>
+                            <div class="total-line">
+                                <span>Remise globale:</span>
+                                <span id="montant-remise-globale">0 DA</span>
+                            </div>
+                            <div class="total-line grand-total">
+                                <span>💰 Total Général:</span>
+                                <span id="total-general">0 DA</span>
+                            </div>
+                        </div>
+
+                        <button class="btn-warning" onclick="ouvrirModalRemiseGlobale('vente')" style="margin: 10px 0; width: 100%;">
+                            🎯 Appliquer Remise Globale
+                        </button>
+                        <button class="btn-secondary" onclick="annulerRemiseGlobale('vente')" style="margin: 5px 0; width: 100%;" 
+                                id="btn-annuler-remise-vente" style="display: none;">
+                            🔄 Annuler Remise Globale
+                        </button>
+
+                        <div class="payment-section">
+                            <div class="form-group">
+                                <label>💳 Mode de paiement:</label>
+                                <select id="payment-method" onchange="changerModePaiement()">
+                                    <option value="paye">💵 PAYÉ</option>
+                                    <option value="instance">⏳ INSTANCE</option>
+                                    <option value="credit">📝 CRÉDIT</option>
+                                </select>
+                            </div>
+                            
+                            <div id="client-credit-section" class="form-group" style="display: none;">
+                                <label>👤 Nom du client (crédit):</label>
+                                <input type="text" id="client-credit" placeholder="Nom du client">
+                            </div>
+                            
+                            <div class="action-buttons">
+                                <button class="btn-ticket" onclick="genererTicketCaissePreview()">👁️ Visualiser</button>
+                                <button class="btn-ticket" onclick="imprimerTicketVente()">🖨️ Imprimer</button>
+                                <button class="btn-success" onclick="finaliserVente()">✅ Finaliser Vente</button>
+                                <button class="btn-secondary" onclick="viderPanier()">🗑️ Vider Panier</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Onglet Services -->
+        <div id="services" class="tab-content">
+            <div class="row">
+                <div class="col-6">
+                    <div class="card">
+                        <h3>🔧 Prestation de Services</h3>
+                        
+                        <div class="service-form">
+                            <div class="form-group">
+                                <label>📋 Type de service:</label>
+                                <div class="service-grid" id="service-grid">
+                                    <div class="service-card" data-type="impression">
+                                        <div class="service-icon">🖨️</div>
+                                        <div class="service-name">Impression</div>
+                                    </div>
+                                    <div class="service-card" data-type="photocopie">
+                                        <div class="service-icon">📄</div>
+                                        <div class="service-name">Photocopie</div>
+                                    </div>
+                                    <div class="service-card" data-type="inscription">
+                                        <div class="service-icon">📝</div>
+                                        <div class="service-name">Inscriptions</div>
+                                    </div>
+                                    <div class="service-card" data-type="web">
+                                        <div class="service-icon">🌐</div>
+                                        <div class="service-name">Services Web</div>
+                                    </div>
+                                    <div class="service-card" data-type="scan">
+                                        <div class="service-icon">📷</div>
+                                        <div class="service-name">Scan</div>
+                                    </div>
+                                    <div class="service-card" data-type="saisie">
+                                        <div class="service-icon">⌨️</div>
+                                        <div class="service-name">Saisie</div>
+                                    </div>
+                                    <div class="service-card" data-type="informatique">
+                                        <div class="service-icon">💻</div>
+                                        <div class="service-name">Informatique</div>
+                                    </div>
+                                    <div class="service-card" data-type="autre">
+                                        <div class="service-icon">🔧</div>
+                                        <div class="service-name">Autre</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>📝 Description:</label>
+                                <textarea id="service-description" rows="3" placeholder="Ex: Impression document 10 pages + Scan..."></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>💰 Montant (DA):</label>
+                                <input type="number" id="service-amount" value="0" min="0">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>👤 Client:</label>
+                                <input type="text" id="service-client" placeholder="Nom du client (optionnel)">
+                            </div>
+                            
+                            <div class="action-buttons">
+                                <button class="btn-primary" onclick="ajouterServiceAuPanier()">➕ Ajouter Service</button>
+                                <button class="btn-secondary" onclick="reinitialiserFormulaireService()">
+                                    🔄 Réinitialiser
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-6">
+                    <div class="card">
+                        <h3>📋 Services à Facturer</h3>
+                        
+                        <div class="table-container">
+                            <table id="services-panier-table">
+                                <thead>
+                                    <tr>
+                                        <th class="col-service">Service</th>
+                                        <th class="col-quantite-service">Quantité</th>
+                                        <th class="col-prix-service">Prix U.</th>
+                                        <th class="col-remise-service">Remise</th>
+                                        <th class="col-total-service">Total</th>
+                                        <th class="col-statut-service">Statut</th> <!-- RÉTABLI: Colonne Statut -->
+                                        <th class="col-action-service">Action</th>
+                                    </tr>
+                                    <tr>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th>
+                                        <th style="text-align: center; font-size: 0.8rem; padding: 5px;">
+                                            <div style="display: flex; gap: 5px;">
+                                                <div class="col-remise-service-type">Type</div> <!-- RÉTABLI: Type remise -->
+                                                <div class="col-remise-service-valeur">Valeur</div>
+                                            </div>
+                                        </th>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="services-panier-body"> 
+                                    <!-- Services panier chargés dynamiquement -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="cart-totals">
+                            <div class="total-line">
+                                <span>Sous-total:</span>
+                                <span id="sous-total-services">0 DA</span>
+                            </div>
+                            <div class="total-line">
+                                <span>Remise globale:</span>
+                                <span id="remise-globale-services">0 DA</span>
+                            </div>
+                            <div class="total-line grand-total">
+                                <span>💰 Total Services:</span>
+                                <span id="total-services">0 DA</span>
+                            </div>
+                        </div>
+
+                        <button class="btn-warning" onclick="ouvrirModalRemiseGlobale('service')" style="margin: 10px 0; width: 100%;">
+                            🎯 Appliquer Remise Globale
+                        </button>
+                        <button class="btn-secondary" onclick="annulerRemiseGlobale('service')" style="margin: 5px 0; width: 100%;" 
+                                id="btn-annuler-remise-service" style="display: none;">
+                            🔄 Annuler Remise Globale
+                        </button>
+
+                        <div class="payment-section">
+                            <div class="form-group">
+                                <label>💳 Mode de paiement:</label>
+                                <select id="service-paiement" onchange="changerModePaiementServices()">
+                                    <option value="paye">💵 PAYÉ</option>
+                                    <option value="instance">⏳ INSTANCE</option>
+                                    <option value="credit">📝 CRÉDIT</option>
+                                </select>
+                            </div>
+                            
+                            <div id="service-client-section" class="form-group" style="display: none;">
+                                <label>👤 Nom du client (crédit):</label>
+                                <input type="text" id="service-client-panier" placeholder="Nom du client">
+                            </div>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button class="btn-ticket" onclick="previsualiserTicketServicesPanier()">👁️ Visualiser</button>
+                            <button class="btn-ticket" onclick="imprimerTicketServices()">🖨️ Imprimer</button>
+                            <button class="btn-success" onclick="finaliserServicesPanier()">✅ Finaliser Services</button>
+                            <button class="btn-secondary" onclick="viderPanierServices()">🗑️ Vider Services</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Onglet Stock -->
+        <div id="stock" class="tab-content">
+            <div class="card">
+                <h3>📦 Gestion du Stock</h3>
+                
+                <div class="stock-controls">
+                    <button class="btn-primary" onclick="chargerStock()">🔄 Actualiser Stock</button>
+                    <button class="btn-secondary" onclick="exporterStock()">📤 Exporter Excel</button>
+                    <input type="file" id="file-input" accept=".xls,.xlsx" style="display: none;">
+                    <button class="btn-secondary" onclick="document.getElementById('file-input').click()">📥 Importer Excel</button>
+                    <button class="btn-warning" onclick="reinitialiserStock()">🔄 Réinitialiser Stock</button>
+                    <button class="btn-primary" onclick="SauvegardeManager.creerStockTest()">🧪 Données Test</button>
+                </div>
+                
+                <div class="table-container">
+                    <table id="stock-table">
+                        <thead>
+                            <tr>
+                                <th>Désignation</th>
+                                <th>Code Barre</th>
+                                <th>Catégorie</th>
+                                <th>Quantité</th>
+                                <th>Prix (DA)</th>
+                                <th>Valeur Stock</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stock-body">
+                            <!-- Stock chargé dynamiquement -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Onglet Historique -->
+        <div id="historique" class="tab-content">
+            <div class="card">
+                <h3>📊 Historique des Transactions</h3>
+                
+                <div class="history-controls">
+                    <button class="btn-warning" onclick="reinitialiserHistorique()">
+                        🗑️ Réinitialiser Historique
+                    </button>
+                    <button class="btn-secondary" onclick="SauvegardeManager.exporterSauvegarde()">
+                        💾 Sauvegarder Historique
+                    </button>
+                </div>
+                
+                <div class="history-tabs">
+                    <button class="subtab-button active" data-subtab="ventes-history">🛒 Ventes</button>
+                    <button class="subtab-button" data-subtab="services-history">🔧 Services</button>
+                </div>
+                
+                <div id="ventes-history" class="subtab-content active">
+                    <div class="table-container">
+                        <table id="sales-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Produits</th>
+                                    <th>Total</th>
+                                    <th>Paiement</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sales-history-body">
+                                <!-- Historique ventes chargé dynamiquement -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div id="services-history" class="subtab-content">
+                    <div class="table-container">
+                        <table id="services-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Service</th>
+                                    <th>Description</th>
+                                    <th>Montant</th>
+                                    <th>Client</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="services-history-body">
+                                <!-- Historique services chargé dynamiquement -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Onglet Récapitulatif -->
+        <div id="recapitulatif" class="tab-content">
+            <div class="card">
+                <h3>📈 Récapitulatif des Ventes et Services</h3>
+                
+                <div class="recap-controls">
+                    <div class="form-group">
+                        <label>📅 Période:</label>
+                        <select id="recap-periode" onchange="changerPeriodeRecap()">
+                            <option value="aujourdhui">Aujourd'hui</option>
+                            <option value="hier">Hier</option>
+                            <option value="semaine">Cette semaine</option>
+                            <option value="mois">Ce mois</option>
+                            <option value="personnalise">Personnalisée</option>
+                        </select>
+                    </div>
+                    
+                    <div id="recap-dates-personnalisees" class="form-group" style="display: none;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <div>
+                                <label>📅 Du:</label>
+                                <input type="date" id="recap-date-debut">
+                            </div>
+                            <div>
+                                <label>📅 Au:</label>
+                                <input type="date" id="recap-date-fin">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn-primary" onclick="genererRecapitulatif()">📊 Générer Récapitulatif</button>
+                    <button class="btn-secondary" onclick="ouvrirChoixExport()">📤 Exporter Excel</button>
+                    <button class="btn-warning" onclick="purgerRecapitulatif()">
+                        🗑️ Purger Récapitulatif
+                    </button>
+                </div>
+                
+                <div class="recap-stats">
+                    <div class="stat-card">
+                        <h4>💵 Ventes Payées</h4>
+                        <div class="stat-value" id="recap-ventes-payees">0 DA</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>⏳ Ventes en Instance</h4>
+                        <div class="stat-value" id="recap-ventes-instance">0 DA</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>📝 Ventes Crédit</h4>
+                        <div class="stat-value" id="recap-ventes-credit">0 DA</div>
+                    </div>
+                    <div class="stat-card total">
+                        <h4>💰 Total Ventes</h4>
+                        <div class="stat-value" id="recap-total-ventes">0 DA</div>
+                    </div>
+                </div>
+                
+                <div class="recap-details">
+                    <h4>📋 Détails des Transactions</h4>
+                    <div class="table-container">
+                        <table id="recap-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Montant</th>
+                                    <th>Client</th>
+                                    <th>Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recap-body">
+                                <!-- Récapitulatif chargé dynamiquement -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    
+    <!-- Service Worker pour PWA - VERSION CORRIGÉE -->
+    <script>
+        // Gestion PWA OPTIMISÉE - Version corrigée pour mode fichier
+        const isFileProtocol = window.location.protocol === 'file:';
+        const isLocalhost = window.location.hostname === 'localhost' || 
+                           window.location.hostname === '127.0.0.1';
+        
+        if ('serviceWorker' in navigator && !isFileProtocol) {
+            // Enregistrer seulement en HTTPS ou localhost HTTP
+            if (window.location.protocol === 'https:' || isLocalhost) {
+                navigator.serviceWorker.register('sw.js')
+                    .then(function(registration) {
+                        console.log('✅ Service Worker enregistré:', registration.scope);
+                        
+                        registration.update();
+                        
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            console.log('🔄 Nouvelle version détectée');
+                            
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    if (confirm('🔄 Nouvelle version disponible! Recharger?')) {
+                                        window.location.reload();
+                                    }
+                                }
+                            });
+                        });
+                    })
+                    .catch(function(error) {
+                        console.log('❌ Service Worker erreur:', error);
+                    });
+            } else {
+                console.log('ℹ️ Service Worker non enregistré (protocole non supporté)');
+            }
+        } else if (isFileProtocol) {
+            console.log('📁 Mode fichier détecté - Service Worker désactivé');
+        }
+
+        // Installation PWA
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            console.log('📱 PWA prête pour installation');
+        });
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('✅ PWA installée');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        }
+
+        // Détection du mode standalone
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            console.log('📱 Application en mode standalone');
+            document.body.classList.add('standalone-mode');
+        }
+
+        // Nettoyage AUTOMATIQUE au chargement - VERSION CORRIGÉE
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🧹 Chargement de CyberGestion - Version Finale Corrigée');
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('forceReload')) {
+                console.log('🔄 Forçage rechargement activé');
+                
+                // Nettoyer tous les caches
+                if ('caches' in window) {
+                    caches.keys().then(names => {
+                        names.forEach(name => {
+                            console.log('🗑️ Suppression cache:', name);
+                            caches.delete(name);
+                        });
+                    });
+                }
+                
+                // Recharger sans le paramètre après nettoyage
+                setTimeout(() => {
+                    window.location.href = window.location.pathname;
+                }, 1000);
+                return;
+            }
+            
+            // Vérifier les mises à jour normales (uniquement si pas en mode fichier)
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller && !isFileProtocol) {
+                navigator.serviceWorker.ready.then(registration => {
+                    registration.update();
+                });
+            }
+        });
+    </script>
+</body>
+</html>

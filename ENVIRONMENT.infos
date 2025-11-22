@@ -1,0 +1,35 @@
+# ENVIRONNEMENT TAURI CONFIGURÉ - SAUVEGARDE
+# Date: $(date)
+# Projet: JVente-app
+
+## VERSIONS CONFIGURÉES :
+- Rust: 1.91.1
+- Cargo: 1.91.1
+- Target: x86_64-pc-windows-gnu
+- Tauri: 1.8.3
+- Tauri-build: 1.5
+
+## CONFIGURATION CARGO (~/.cargo/config.toml):
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+ar = "x86_64-w64-mingw32-gcc-ar"
+
+## DÉPENDANCES SYSTÈME INSTALLÉES :
+- gcc-mingw-w64-x86-64
+- libwebkit2gtk-4.0-dev
+- build-essential
+
+## COMMANDES DE BUILD :
+cd src-tauri
+cargo build --target x86_64-pc-windows-gnu --release
+
+## STRUCTURE VALIDÉE :
+✅ Cargo.toml - Configuration correcte
+✅ tauri.conf.json - JSON valide
+✅ src/main.rs - Code Rust fonctionnel
+✅ Compilation Windows x86-64 - OK
+
+## NOTES :
+- Pas de Node.js nécessaire
+- Compilation Rust pure
+- Vendor disponible si besoin
